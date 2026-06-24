@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f5f7;
+    color: #1d1d1f;
+    padding: 16px;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 22px; margin: 8px 0 16px; }
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  button {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    background: #e5e5ea;
+    color: #1d1d1f;
+  }
+  button.primary { background: #007aff; color: white; }
+  button.danger { background: #ff3b30; color: white; }
+  input[type="text"] {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #d1d1d6;
+    font-size: 15px;
+  }
+  .add-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li {
+    background: white;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+  li.done span.text { text-decoration: line-through; color: #8e8e93; }
+  li input[type="checkbox"] { width: 20px; height: 20px; flex-shrink: 0; }
+  li span.text { flex: 1; word-break: break-word; }
+  li button.remove {
+    background: none;
+    color: #ff3b30;
+    padding: 4px 8px;
+    font-size: 18px;
+  }
+  .empty { text-align: center; color: #8e8e93; padding: 24px 0; }
+  .status {
+    font-size: 12px;
+    color: #8e8e93;
+    text-align: center;
+    margin-top: 16px;
+  }
+  #fileInput { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Task Tracker</h1>
+
+<div class="toolbar">
+  <button class="primary" onclick="saveToFile()">Save to File</button>
+  <button onclick="document.getElementById('fileInput').click()">Load from File</button>
+  <button class="danger" onclick="clearAll()">Clear All</button>
+  <input type="file" id="fileInput" accept="application/json">
+</div>
+
+<div class="add-row">
+  <input type="text" id="newTask" placeholder="Add a task..." onkeydown="if(event.key==='Enter') addTask()">
+  <button class="primary" onclick="addTask()">Add</button>
+</div>
+
+<ul id="taskList"></ul>
+<div class="empty" id="emptyMsg" style="display:none;">No tasks yet. Add one above.</div>
+
+<div class="status" id="status">Loading...</div>
+
+<script>
+  const STORAGE_KEY = 'task-tracker-data-v1';
+  let tasks = [];
+
+  function loadFromStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      tasks = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      tasks = [];
+    }
+  }
+
+  function persist() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    setStatus('Saved automatically to this device · ' + tasks.length + ' task' + (tasks.length === 1 ? '' : 's'));
+  }
+
+  function setStatus(msg) {
+    document.getElementById('status').textContent = msg;
+  }
+
+  function render() {
+    const list = document.getElementById('taskList');
+    const empty = document.getElementById('emptyMsg');
+    list.innerHTML = '';
+    if (tasks.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    tasks.forEach((task, i) => {
+      const li = document.createElement('li');
+      if (task.done) li.classList.add('done');
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = task.done;
+      checkbox.onchange = () => toggleTask(i);
+
+      const span = document.createElement('span');
+      span.className = 'text';
+      span.textContent = task.text;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'remove';
+      removeBtn.textContent = '✕';
+      removeBtn.onclick = () => removeTask(i);
+
+      li.appendChild(checkbox);
+      li.appendChild(span);
+      li.appendChild(removeBtn);
+      list.appendChild(li);
+    });
+  }
+
+  function addTask() {
+    const input = document.getElementById('newTask');
+    const text = input.value.trim();
+    if (!text) return;
+    tasks.push({ text, done: false, created: new Date().toISOString() });
+    input.value = '';
+    persist();
+    render();
+  }
+
+  function toggleTask(i) {
+    tasks[i].done = !tasks[i].done;
+    persist();
+    render();
+  }
+
+  function removeTask(i) {
+    tasks.splice(i, 1);
+    persist();
+    render();
+  }
+
+  function clearAll() {
+    if (tasks.length === 0) return;
+    if (!confirm('Delete all tasks? This cannot be undone.')) return;
+    tasks = [];
+    persist();
+    render();
+  }
+
+  function saveToFile() {
+    const blob = new Blob([JSON.stringify(tasks, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tasks.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStatus('Exported tasks.json — choose where to save it (Files, iCloud Drive, Google Drive, etc.)');
+  }
+
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const imported = JSON.parse(evt.target.result);
+        if (!Array.isArray(imported)) throw new Error('Invalid format');
+        tasks = imported;
+        persist();
+        render();
+        setStatus('Loaded ' + tasks.length + ' task(s) from file');
+      } catch (err) {
+        alert('Could not read that file — make sure it\'s a tasks.json exported from this app.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  loadFromStorage();
+  render();
+  persist();
+</script>
+
+</body>
+</html>
