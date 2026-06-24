@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Meal AI</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#ffffff; --text:#1d1d1f; --muted:#8e8e93;
+  --accent:#007aff; --danger:#ff3b30; --good:#34c759; --warn:#ff9500;
+  --border:#e5e5ea;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);padding-bottom:74px;}
+.wrap{max-width:720px;margin:0 auto;padding:14px 14px 10px;}
+h1{font-size:20px;margin:4px 0 2px;}
+h2{font-size:16px;margin:18px 0 8px;}
+h3{font-size:14px;margin:0 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+p.sub{color:var(--muted);font-size:13px;margin:0 0 14px;}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.col{display:flex;flex-direction:column;gap:8px;}
+button{border:none;border-radius:10px;padding:10px 14px;font-size:14px;cursor:pointer;background:var(--border);color:var(--text);font-weight:500;}
+button.primary{background:var(--accent);color:#fff;}
+button.danger{background:var(--danger);color:#fff;}
+button.good{background:var(--good);color:#fff;}
+button.small{padding:6px 10px;font-size:12px;}
+button:disabled{opacity:.5;}
+input[type=text],input[type=number],input[type=date],input[type=password],select,textarea{
+  width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);font-size:14px;font-family:inherit;background:#fff;color:var(--text);
+}
+textarea{resize:vertical;min-height:60px;}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
+.field{margin-bottom:10px;}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--border);border-radius:999px;padding:4px 10px;font-size:12px;margin:2px;}
+.chip.on{background:var(--accent);color:#fff;}
+.chip.tag{cursor:pointer;}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:6px 4px env(safe-area-inset-bottom,6px);z-index:50;}
+.tabs button{flex:1;background:none;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;color:var(--muted);font-weight:500;}
+.tabs button.active{color:var(--accent);}
+.tabs .ic{font-size:18px;}
+.view{display:none;}
+.view.active{display:block;}
+.meal-block{border-left:3px solid var(--accent);padding-left:10px;margin-bottom:10px;}
+.meal-block h4{margin:0 0 4px;font-size:13px;}
+.bar{background:var(--border);border-radius:6px;height:10px;overflow:hidden;margin:4px 0;}
+.bar > div{height:100%;background:var(--accent);}
+.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.stat{background:#fafafa;border-radius:10px;padding:10px;text-align:center;}
+.stat .n{font-size:20px;font-weight:700;}
+.stat .l{font-size:11px;color:var(--muted);}
+ul.plain{list-style:none;padding:0;margin:0;}
+li.item{display:flex;justify-content:space-between;align-items:center;background:#fafafa;border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px;}
+.badge{font-size:10px;padding:2px 6px;border-radius:6px;background:var(--accent);color:#fff;}
+.badge.warn{background:var(--warn);}
+.badge.muted{background:var(--border);color:var(--text);}
+.recipe-card{cursor:pointer;}
+.recipe-card .meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.msg{padding:8px 10px;border-radius:10px;margin-bottom:6px;font-size:13px;max-width:90%;}
+.msg.user{background:var(--accent);color:#fff;margin-left:auto;}
+.msg.ai{background:#eee;}
+.muted{color:var(--muted);}
+.flexend{justify-content:flex-end;}
+.close-x{position:absolute;top:10px;right:14px;font-size:20px;background:none;color:var(--muted);}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:none;align-items:flex-end;justify-content:center;}
+.modal-bg.show{display:flex;}
+.modal{background:#fff;border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:720px;max-height:88vh;overflow:auto;position:relative;}
+.toprow{display:flex;justify-content:space-between;align-items:center;}
+.pillsel{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.note{font-size:11px;color:var(--muted);margin-top:4px;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- TODAY -->
+  <div class="view active" id="view-today">
+    <div class="row toprow">
+      <div>
+        <h1>Meal AI</h1>
+        <p class="sub" id="profileLabel">Profile: Me</p>
+      </div>
+      <button class="small" onclick="openProfileSwitcher()">Switch profile</button>
+    </div>
+
+    <div class="card">
+      <h3>Tomorrow's plan</h3>
+      <div id="suggestionBox">Loading...</div>
+      <div class="row" style="margin-top:10px;">
+        <button class="primary" onclick="generateSuggestion()">Regenerate</button>
+        <button onclick="openChat('Suggest tomorrow\\'s full day of meals and explain why.')">Ask AI to refine</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Expiring soon</h3>
+      <div id="expiringBox"><p class="muted">Nothing expiring soon.</p></div>
+    </div>
+
+    <div class="card">
+      <h3>Quick stats (last 30 days)</h3>
+      <div class="statgrid" id="quickStats"></div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="view" id="view-log">
+    <h1>Log a meal</h1>
+    <div class="card">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="logDate">
+      </div>
+      <div class="field">
+        <label>Meal</label>
+        <div class="pillsel" id="mealTypePicker">
+          <span class="chip tag on" data-val="breakfast" onclick="pickMealType(this)">Breakfast</span>
+          <span class="chip tag" data-val="lunch" onclick="pickMealType(this)">Lunch</span>
+          <span class="chip tag" data-val="dinner" onclick="pickMealType(this)">Dinner</span>
+          <span class="chip tag" data-val="snack" onclick="pickMealType(this)">Snack</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>What did you eat? (free text, e.g. "masala dosa with coconut chutney and coffee")</label>
+        <textarea id="logText" placeholder="Type naturally..."></textarea>
+        <div class="note" id="logNote">Without an AI key, this is matched against your recipe library by name. Add a key in Settings for smarter extraction.</div>
+      </div>
+      <div class="row">
+        <button class="primary" onclick="submitLog()">Save log</button>
+        <button onclick="openRecipePicker('log')">Pick from recipes instead</button>
+      </div>
+    </div>
+
+    <h2>Recent logs</h2>
+    <div id="recentLogs"></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="view" id="view-history">
+    <h1>History</h1>
+    <div class="card">
+      <div class="row">
+        <select id="historyRange" onchange="renderHistory()">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="9999">All time</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Frequency</h3>
+      <div id="freqList"></div>
+    </div>
+    <div class="card">
+      <h3>Not eaten recently</h3>
+      <div id="notEatenList"></div>
+    </div>
+    <div class="card">
+      <h3>Food-group balance</h3>
+      <p class="note">Approximate, based on recipe tags — not lab-grade nutrition data.</p>
+      <div id="balanceBars"></div>
+    </div>
+    <div class="card">
+      <h3>By day</h3>
+      <div id="dayList"></div>
+    </div>
+  </div>
+
+  <!-- RECIPES -->
+  <div class="view" id="view-recipes">
+    <div class="row toprow">
+      <h1>Recipes</h1>
+      <button class="primary small" onclick="openRecipeEditor()">+ New</button>
+    </div>
+    <div class="field">
+      <input type="text" id="recipeSearch" placeholder="Search recipes or ingredients..." oninput="renderRecipes()">
+    </div>
+    <div class="pillsel" id="recipeFilterMeal">
+      <span class="chip tag on" data-val="all" onclick="pickFilter(this,'recipeFilterMeal')">All</span>
+      <span class="chip tag" data-val="breakfast" onclick="pickFilter(this,'recipeFilterMeal')">Breakfast</span>
+      <span class="chip tag" data-val="lunch" onclick="pickFilter(this,'recipeFilterMeal')">Lunch</span>
+      <span class="chip tag" data-val="dinner" onclick="pickFilter(this,'recipeFilterMeal')">Dinner</span>
+      <span class="chip tag" data-val="snack" onclick="pickFilter(this,'recipeFilterMeal')">Snack</span>
+    </div>
+    <div id="recipeList"></div>
+  </div>
+
+  <!-- GROCERY -->
+  <div class="view" id="view-grocery">
+    <h1>Grocery</h1>
+    <div class="card">
+      <div class="field"><label>Item</label><input type="text" id="groceryName"></div>
+      <div class="row">
+        <div class="field" style="flex:1"><label>Bought</label><input type="date" id="groceryBought"></div>
+        <div class="field" style="flex:1"><label>Use by</label><input type="date" id="groceryExpiry"></div>
+      </div>
+      <button class="primary" onclick="addGrocery()">Add item</button>
+    </div>
+    <div id="groceryList"></div>
+    <div class="card">
+      <h3>Seasonal foods this month</h3>
+      <div id="seasonalBox"></div>
+    </div>
+  </div>
+
+  <!-- PLAN -->
+  <div class="view" id="view-plan">
+    <h1>Weekly planner</h1>
+    <div id="weekPlanner"></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="view" id="view-stats">
+    <h1>Statistics</h1>
+    <div class="statgrid" id="statsGrid"></div>
+    <div class="card">
+      <h3>Favorites</h3>
+      <div id="favList"></div>
+    </div>
+  </div>
+
+  <!-- CHAT -->
+  <div class="view" id="view-chat">
+    <h1>Ask AI</h1>
+    <div class="card" id="chatLog" style="min-height:200px;"></div>
+    <div class="row">
+      <input type="text" id="chatInput" placeholder="e.g. I have potato and paneer, what can I make?" onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="primary" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="view" id="view-settings">
+    <h1>Settings</h1>
+    <div class="card">
+      <h3>Profiles</h3>
+      <div id="profileList"></div>
+      <div class="row" style="margin-top:8px;">
+        <input type="text" id="newProfileName" placeholder="New profile name (e.g. Mom)">
+        <button onclick="addProfile()">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>AI provider (optional, your own key)</h3>
+      <p class="note">Your key is stored only in this browser's local storage. It is sent directly from your browser to the AI provider — never anywhere else. Leave blank to use free rule-based suggestions only.</p>
+      <div class="field">
+        <label>Provider</label>
+        <select id="aiProvider">
+          <option value="none">None (free, rule-based only)</option>
+          <option value="anthropic">Anthropic Claude</option>
+          <option value="openai">OpenAI</option>
+        </select>
+      </div>
+      <div class="field"><label>API key</label><input type="password" id="aiKey" placeholder="sk-... or your key"></div>
+      <div class="field"><label>Model</label><input type="text" id="aiModel" placeholder="e.g. claude-sonnet-4-5-20250929 or gpt-4o-mini"></div>
+      <button class="primary" onclick="saveAiSettings()">Save AI settings</button>
+    </div>
+    <div class="card">
+      <h3>Data</h3>
+      <div class="row">
+        <button onclick="exportData()">Save to file</button>
+        <button onclick="document.getElementById('importFile').click()">Load from file</button>
+        <button class="danger" onclick="wipeProfile()">Wipe this profile</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+      <p class="note" id="dataStatus"></p>
+    </div>
+  </div>
+
+</div>
+
+<div class="tabs">
+  <button class="active" data-v="today" onclick="showView('today')"><span class="ic">🏠</span>Today</button>
+  <button data-v="log" onclick="showView('log')"><span class="ic">📝</span>Log</button>
+  <button data-v="history" onclick="showView('history')"><span class="ic">📊</span>History</button>
+  <button data-v="recipes" onclick="showView('recipes')"><span class="ic">📖</span>Recipes</button>
+  <button data-v="grocery" onclick="showView('grocery')"><span class="ic">🛒</span>Grocery</button>
+  <button data-v="plan" onclick="showView('plan')"><span class="ic">📅</span>Plan</button>
+  <button data-v="stats" onclick="showView('stats')"><span class="ic">🏆</span>Stats</button>
+  <button data-v="chat" onclick="showView('chat')"><span class="ic">💬</span>Chat</button>
+  <button data-v="settings" onclick="showView('settings')"><span class="ic">⚙️</span>More</button>
+</div>
+
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalBody"></div></div>
+
+<script>
+/* ---------------- storage ---------------- */
+const STORE_KEY = 'mealAI_v1';
+function defaultStore(){
+  return {
+    profiles:[{id:'p1',name:'Me'}],
+    active:'p1',
+    settings:{aiProvider:'none',aiKey:'',aiModel:''},
+    data:{ p1: blankProfileData() }
+  };
+}
+function blankProfileData(){
+  return { recipes: seedRecipes(), log:[], ingredientPrefs:{}, grocery:[], weeklyPlan:{} };
+}
+function seedRecipes(){
+  const r = (name,mealTypes,foodGroups,ingredients,tags=[])=>({
+    id:'r_'+Math.random().toString(36).slice(2,9),
+    name, mealTypes, foodGroups, ingredients, tags,
+    cuisine:'Indian', prepTime:15, cookTime:15, difficulty:'Easy', servings:2,
+    steps:[], rating:0, favorite:false
+  });
+  return [
+    r('Idli',['breakfast'],['grain','fermented'],['Idli batter','Coconut chutney']),
+    r('Masala Dosa',['breakfast','dinner'],['grain','fermented'],['Rice','Urad dal','Potato','Onion','Oil']),
+    r('Poha',['breakfast'],['grain'],['Poha','Onion','Peanuts','Curry leaves']),
+    r('Vegetable Upma',['breakfast'],['grain','fiber'],['Rava','Carrot','Beans','Peas']),
+    r('Sambar Rice',['lunch'],['grain','legume','fiber'],['Rice','Toor dal','Drumstick','Tamarind']),
+    r('Rajma Rice',['lunch','dinner'],['grain','legume','protein','fiber'],['Rajma','Rice','Onion','Tomato']),
+    r('Curd Rice',['lunch'],['grain','dairy'],['Rice','Curd']),
+    r('Chapati',['dinner','lunch'],['grain'],['Wheat flour']),
+    r('Paneer Curry',['dinner'],['protein','dairy'],['Paneer','Tomato','Onion','Cream']),
+    r('Veg Biryani',['lunch'],['grain','fiber'],['Rice','Mixed vegetables','Spices']),
+    r('Lemon Rice',['lunch'],['grain'],['Rice','Lemon','Peanuts','Curry leaves']),
+    r('Dal Fry',['lunch','dinner'],['legume','protein','fiber'],['Toor dal','Onion','Tomato','Garlic']),
+    r('Paneer Butter Masala',['dinner'],['protein','dairy'],['Paneer','Tomato','Butter','Cream']),
+    r('Pasta',['dinner'],['grain'],['Pasta','Tomato sauce','Cheese']),
+    r('Fried Rice',['dinner','lunch'],['grain','fiber'],['Rice','Carrot','Beans','Capsicum']),
+    r('Grilled Chicken',['dinner'],['protein'],['Chicken','Spices','Oil']),
+    r('Soup',['dinner','snack'],['fiber'],['Mixed vegetables','Stock']),
+    r('Salad',['lunch','dinner','snack'],['fiber','leafyVeg'],['Cucumber','Tomato','Lettuce','Lemon']),
+  ];
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return defaultStore();
+    const parsed = JSON.parse(raw);
+    if(!parsed.profiles||!parsed.data) return defaultStore();
+    return parsed;
+  }catch(e){ return defaultStore(); }
+}
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(STORE)); }
+let STORE = load();
+function curData(){ return STORE.data[STORE.active]; }
+
+/* ---------------- nav ---------------- */
+function showView(v){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.v===v));
+  if(v==='today') renderToday();
+  if(v==='log') renderLog();
+  if(v==='history') renderHistory();
+  if(v==='recipes') renderRecipes();
+  if(v==='grocery') renderGrocery();
+  if(v==='plan') renderPlan();
+  if(v==='stats') renderStats();
+  if(v==='settings') renderSettings();
+}
+function openModal(html){ document.getElementById('modalBody').innerHTML = html; document.getElementById('modalBg').classList.add('show'); }
+function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
+document.getElementById('modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeModal(); });
+
+/* ---------------- helpers ---------------- */
+function todayStr(d=new Date()){ return d.toISOString().slice(0,10); }
+function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return todayStr(d); }
+function findRecipe(id){ return curData().recipes.find(r=>r.id===id); }
+const ALL_GROUPS = ['protein','fiber','leafyVeg','fruit','dairy','grain','fermented','legume'];
+
+/* ---------------- TODAY / SUGGESTIONS ---------------- */
+function ruleBasedSuggestion(){
+  const data = curData();
+  const log = data.log;
+  const since7 = daysAgo(7), since14 = daysAgo(14);
+  const recipeScore = {};
+  data.recipes.forEach(r=>recipeScore[r.id]=0);
+  log.forEach(l=>{
+    if(!l.recipeId) return;
+    if(l.date>=since7) recipeScore[l.recipeId] = (recipeScore[l.recipeId]||0) - 6;
+    else if(l.date>=since14) recipeScore[l.recipeId] = (recipeScore[l.recipeId]||0) - 2;
+  });
+  const groupCount = {};
+  ALL_GROUPS.forEach(g=>groupCount[g]=0);
+  log.filter(l=>l.date>=since7).forEach(l=>{
+    const rec = l.recipeId ? findRecipe(l.recipeId) : null;
+    if(rec) rec.foodGroups.forEach(g=>groupCount[g]=(groupCount[g]||0)+1);
+  });
+  const avgCount = Object.values(groupCount).reduce((a,b)=>a+b,0)/ALL_GROUPS.length || 0;
+  const expiring = data.grocery.filter(g=>!g.used && g.expiry && g.expiry<=daysAgo(-3));
+  const expNames = expiring.map(g=>g.name.toLowerCase());
+
+  data.recipes.forEach(r=>{
+    let s = recipeScore[r.id]||0;
+    s += (r.rating||0)*3;
+    r.foodGroups.forEach(g=>{ if((groupCount[g]||0) < avgCount) s += 3; });
+    if(r.ingredients.some(ing=>expNames.some(e=>ing.toLowerCase().includes(e)))) s += 5;
+    recipeScore[r.id] = s;
+  });
+
+  const yesterday = daysAgo(1);
+  const yesterdayRecipeIds = new Set(log.filter(l=>l.date===yesterday).map(l=>l.recipeId));
+
+  const result = {};
+  ['breakfast','lunch','dinner'].forEach(mt=>{
+    const candidates = data.recipes.filter(r=>r.mealTypes.includes(mt) && !yesterdayRecipeIds.has(r.id));
+    candidates.sort((a,b)=>(recipeScore[b.id]||0)-(recipeScore[a.id]||0));
+    const pick = candidates[0] || data.recipes.find(r=>r.mealTypes.includes(mt));
+    if(!pick){ result[mt]=null; return; }
+    const reasons=[];
+    const last7 = log.some(l=>l.date>=since7 && l.recipeId===pick.id);
+    if(!last7) reasons.push('Not eaten in the last week');
+    if((pick.rating||0)>=4) reasons.push('One of your favorites');
+    pick.foodGroups.forEach(g=>{ if((groupCount[g]||0) < avgCount) reasons.push('Boosts low '+g); });
+    if(pick.ingredients.some(ing=>expNames.some(e=>ing.toLowerCase().includes(e)))) reasons.push('Uses an ingredient expiring soon');
+    result[mt] = {recipe:pick, reasons};
+  });
+  return result;
+}
+function renderSuggestionResult(result, aiText){
+  let html='';
+  if(aiText){
+    html += `<div class="card" style="background:#eef6ff;margin-bottom:8px;"><strong>AI take:</strong><div style="margin-top:6px;white-space:pre-wrap;">${escapeHtml(aiText)}</div></div>`;
+  }
+  ['breakfast','lunch','dinner'].forEach(mt=>{
+    const r = result[mt];
+    if(!r || !r.recipe){ html += `<div class="meal-block"><h4>${cap(mt)}</h4><p class="muted">Add some recipes tagged "${mt}" first.</p></div>`; return; }
+    html += `<div class="meal-block"><h4>${cap(mt)}: ${escapeHtml(r.recipe.name)}</h4>`;
+    if(r.reasons && r.reasons.length) html += `<p class="muted">✓ ${r.reasons.join(' &nbsp;✓ ')}</p>`;
+    html += `</div>`;
+  });
+  document.getElementById('suggestionBox').innerHTML = html;
+}
+async function generateSuggestion(){
+  document.getElementById('suggestionBox').innerHTML = 'Thinking...';
+  const result = ruleBasedSuggestion();
+  renderSuggestionResult(result, null);
+  if(STORE.settings.aiProvider!=='none' && STORE.settings.aiKey){
+    try{
+      const ctx = buildAiContext();
+      const prompt = `Based on this user's meal history, preferences, and pantry, suggest tomorrow's breakfast, lunch and dinner from their recipe library where possible (or new simple recipe ideas blending disliked ingredients into liked dishes). Be concise (under 120 words), and explain briefly why.\n\nContext:\n${JSON.stringify(ctx)}`;
+      const text = await callAI(prompt);
+      renderSuggestionResult(result, text);
+    }catch(e){
+      renderSuggestionResult(result, null);
+    }
+  }
+}
+function renderExpiring(){
+  const data = curData();
+  const soon = data.grocery.filter(g=>!g.used && g.expiry && g.expiry<=daysAgo(-3)).sort((a,b)=>a.expiry.localeCompare(b.expiry));
+  const box = document.getElementById('expiringBox');
+  if(soon.length===0){ box.innerHTML = '<p class="muted">Nothing expiring soon.</p>'; return; }
+  box.innerHTML = soon.map(g=>`<li class="item"><span>${escapeHtml(g.name)}</span><span class="badge warn">by ${g.expiry}</span></li>`).join('');
+}
+function renderQuickStats(){
+  const data = curData();
+  const since = daysAgo(30);
+  const logs = data.log.filter(l=>l.date>=since);
+  const uniqueDays = new Set(logs.map(l=>l.date)).size;
+  const groupSet = new Set();
+  logs.forEach(l=>{ const r=l.recipeId?findRecipe(l.recipeId):null; if(r) r.foodGroups.forEach(g=>groupSet.add(g)); });
+  const veg = logs.filter(l=>{ const r=l.recipeId?findRecipe(l.recipeId):null; return r && (r.foodGroups.includes('fiber')||r.foodGroups.includes('leafyVeg')); }).length;
+  document.getElementById('quickStats').innerHTML = `
+    <div class="stat"><div class="n">${logs.length}</div><div class="l">Meals logged</div></div>
+    <div class="stat"><div class="n">${uniqueDays}</div><div class="l">Active days</div></div>
+    <div class="stat"><div class="n">${groupSet.size}/${ALL_GROUPS.length}</div><div class="l">Food groups hit</div></div>
+    <div class="stat"><div class="n">${veg}</div><div class="l">Veg-forward meals</div></div>
+  `;
+}
+function renderToday(){
+  document.getElementById('profileLabel').textContent = 'Profile: ' + (STORE.profiles.find(p=>p.id===STORE.active)||{}).name;
+  generateSuggestion();
+  renderExpiring();
+  renderQuickStats();
+}
+
+/* ---------------- LOG ---------------- */
+let pickedMealType='breakfast';
+function pickMealType(el){
+  document.querySelectorAll('#mealTypePicker .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); pickedMealType = el.dataset.val;
+}
+function submitLog(){
+  const text = document.getElementById('logText').value.trim();
+  const date = document.getElementById('logDate').value || todayStr();
+  if(!text){ alert('Type what you ate.'); return; }
+  const data = curData();
+  const lower = text.toLowerCase();
+  let matched = data.recipes.find(r=>lower.includes(r.name.toLowerCase()));
+  data.log.push({ id:'l_'+Math.random().toString(36).slice(2,9), date, mealType:pickedMealType, text, recipeId: matched?matched.id:null });
+  save();
+  document.getElementById('logText').value='';
+  renderLog(); renderToday();
+}
+function logFromRecipe(recipeId){
+  const date = document.getElementById('logDate').value || todayStr();
+  const data = curData();
+  data.log.push({ id:'l_'+Math.random().toString(36).slice(2,9), date, mealType:pickedMealType, text: findRecipe(recipeId).name, recipeId });
+  save(); closeModal(); renderLog(); renderToday();
+}
+function renderLog(){
+  if(!document.getElementById('logDate').value) document.getElementById('logDate').value = todayStr();
+  const data = curData();
+  const recent = [...data.log].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,15);
+  document.getElementById('recentLogs').innerHTML = recent.map(l=>`
+    <li class="item"><span><span class="badge muted">${cap(l.mealType)}</span> ${l.date} — ${escapeHtml(l.text)}</span>
+    <button class="small danger" onclick="deleteLog('${l.id}')">✕</button></li>
+  `).join('') || '<p class="muted">No logs yet.</p>';
+}
+function deleteLog(id){
+  const data = curData(); data.log = data.log.filter(l=>l.id!==id); save(); renderLog(); renderToday();
+}
+
+/* ---------------- HISTORY ---------------- */
+function renderHistory(){
+  const range = parseInt(document.getElementById('historyRange').value,10);
+  const since = range>365? '0000-00-00' : daysAgo(range);
+  const data = curData();
+  const logs = data.log.filter(l=>l.date>=since);
+  const freq = {};
+  logs.forEach(l=>{ const name = l.recipeId? findRecipe(l.recipeId)?.name : l.text; if(name) freq[name]=(freq[name]||0)+1; });
+  const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('freqList').innerHTML = sorted.slice(0,12).map(([n,c])=>`<li class="item"><span>${escapeHtml(n)}</span><span class="badge">${c}×</span></li>`).join('') || '<p class="muted">No data yet.</p>';
+
+  const eatenIds = new Set(logs.map(l=>l.recipeId).filter(Boolean));
+  const notEaten = data.recipes.filter(r=>!eatenIds.has(r.id));
+  document.getElementById('notEatenList').innerHTML = notEaten.slice(0,12).map(r=>`<li class="item"><span>${escapeHtml(r.name)}</span><span class="badge muted">not logged</span></li>`).join('') || '<p class="muted">You\'ve had everything in your library recently.</p>';
+
+  const groupCount = {}; ALL_GROUPS.forEach(g=>groupCount[g]=0);
+  logs.forEach(l=>{ const r=l.recipeId?findRecipe(l.recipeId):null; if(r) r.foodGroups.forEach(g=>groupCount[g]++); });
+  const max = Math.max(1,...Object.values(groupCount));
+  document.getElementById('balanceBars').innerHTML = ALL_GROUPS.map(g=>`
+    <div style="margin-bottom:6px;"><div class="row" style="justify-content:space-between;"><span style="font-size:12px;">${g}</span><span style="font-size:12px;" class="muted">${groupCount[g]}</span></div>
+    <div class="bar"><div style="width:${(groupCount[g]/max*100)}%"></div></div></div>
+  `).join('');
+
+  const byDay = {};
+  logs.forEach(l=>{ byDay[l.date] = byDay[l.date]||[]; byDay[l.date].push(l); });
+  const days = Object.keys(byDay).sort().reverse().slice(0,20);
+  document.getElementById('dayList').innerHTML = days.map(d=>`
+    <div style="margin-bottom:8px;"><strong style="font-size:12px;">${d}</strong>
+    ${byDay[d].map(l=>`<div style="font-size:12px;color:var(--muted);">${cap(l.mealType)}: ${escapeHtml(l.text)}</div>`).join('')}</div>
+  `).join('') || '<p class="muted">No data yet.</p>';
+}
+
+/* ---------------- RECIPES ---------------- */
+let recipeFilterMeal='all';
+function pickFilter(el,groupId){
+  document.querySelectorAll('#'+groupId+' .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); recipeFilterMeal = el.dataset.val; renderRecipes();
+}
+function renderRecipes(){
+  const q = (document.getElementById('recipeSearch').value||'').toLowerCase();
+  const data = curData();
+  let list = data.recipes.filter(r=>{
+    const matchQ = !q || r.name.toLowerCase().includes(q) || r.ingredients.some(i=>i.toLowerCase().includes(q));
+    const matchMeal = recipeFilterMeal==='all' || r.mealTypes.includes(recipeFilterMeal);
+    return matchQ && matchMeal;
+  });
+  document.getElementById('recipeList').innerHTML = list.map(r=>`
+    <div class="card recipe-card" onclick="openRecipeEditor('${r.id}')">
+      <div class="row toprow">
+        <strong>${escapeHtml(r.name)} ${r.favorite?'❤️':''}</strong>
+        <span class="badge muted">${'⭐'.repeat(r.rating||0) || 'unrated'}</span>
+      </div>
+      <div class="meta">${r.mealTypes.map(cap).join(', ')} · ${r.prepTime+r.cookTime}m · ${r.difficulty}</div>
+      <div class="meta">${r.ingredients.slice(0,5).join(', ')}${r.ingredients.length>5?'…':''}</div>
+    </div>
+  `).join('') || '<p class="muted">No recipes match.</p>';
+}
+function openRecipeEditor(id){
+  const data = curData();
+  const r = id ? data.recipes.find(x=>x.id===id) : {id:null,name:'',mealTypes:[],foodGroups:[],ingredients:[],tags:[],cuisine:'',prepTime:10,cookTime:10,difficulty:'Easy',servings:2,steps:[],rating:0,favorite:false};
+  const mealChips = ['breakfast','lunch','dinner','snack'].map(m=>`<span class="chip tag ${r.mealTypes.includes(m)?'on':''}" data-m="${m}" onclick="this.classList.toggle('on')">${cap(m)}</span>`).join('');
+  const groupChips = ALL_GROUPS.map(g=>`<span class="chip tag ${r.foodGroups.includes(g)?'on':''}" data-g="${g}" onclick="this.classList.toggle('on')">${g}</span>`).join('');
+  openModal(`
+    <button class="close-x" onclick="closeModal()">✕</button>
+    <h2>${id?'Edit recipe':'New recipe'}</h2>
+    <div class="field"><label>Name</label><input type="text" id="rName" value="${escapeAttr(r.name)}"></div>
+    <div class="field"><label>Meal types</label><div class="pillsel" id="rMeals">${mealChips}</div></div>
+    <div class="field"><label>Food groups (for balance tracking)</label><div class="pillsel" id="rGroups">${groupChips}</div></div>
+    <div class="field"><label>Ingredients (comma separated)</label><textarea id="rIngredients">${escapeHtml(r.ingredients.join(', '))}</textarea></div>
+    <div class="field"><label>Steps (one per line, optional)</label><textarea id="rSteps">${escapeHtml((r.steps||[]).join('\\n'))}</textarea></div>
+    <div class="row">
+      <div class="field" style="flex:1"><label>Prep min</label><input type="number" id="rPrep" value="${r.prepTime}"></div>
+      <div class="field" style="flex:1"><label>Cook min</label><input type="number" id="rCook" value="${r.cookTime}"></div>
+      <div class="field" style="flex:1"><label>Servings</label><input type="number" id="rServ" value="${r.servings}"></div>
+    </div>
+    <div class="field"><label>Rating</label>
+      <div class="pillsel" id="rRating">${[1,2,3,4,5].map(n=>`<span class="chip tag ${r.rating>=n?'on':''}" data-n="${n}" onclick="setRatingChip(this)">${'⭐'.repeat(n)}</span>`).join('')}</div>
+    </div>
+    <div class="row"><button class="primary" onclick="saveRecipe('${id||''}')">Save</button>
+    ${id?`<button class="danger" onclick="deleteRecipe('${id}')">Delete</button>`:''}</div>
+  `);
+}
+function setRatingChip(el){
+  document.querySelectorAll('#rRating .chip').forEach(c=>c.classList.remove('on'));
+  const n = parseInt(el.dataset.n,10);
+  document.querySelectorAll('#rRating .chip').forEach(c=>{ if(parseInt(c.dataset.n,10)<=n) c.classList.add('on'); });
+}
+function saveRecipe(id){
+  const data = curData();
+  const mealTypes = [...document.querySelectorAll('#rMeals .chip.on')].map(c=>c.dataset.m);
+  const foodGroups = [...document.querySelectorAll('#rGroups .chip.on')].map(c=>c.dataset.g);
+  const ratingChips = [...document.querySelectorAll('#rRating .chip.on')];
+  const rating = ratingChips.length;
+  const payload = {
+    name: document.getElementById('rName').value.trim() || 'Untitled',
+    mealTypes, foodGroups,
+    ingredients: document.getElementById('rIngredients').value.split(',').map(s=>s.trim()).filter(Boolean),
+    steps: document.getElementById('rSteps').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    prepTime: parseInt(document.getElementById('rPrep').value,10)||0,
+    cookTime: parseInt(document.getElementById('rCook').value,10)||0,
+    servings: parseInt(document.getElementById('rServ').value,10)||1,
+    rating, difficulty:'Easy', cuisine:'', tags:[], favorite:false
+  };
+  if(id){
+    const idx = data.recipes.findIndex(r=>r.id===id);
+    data.recipes[idx] = {...data.recipes[idx], ...payload};
+  } else {
+    payload.id = 'r_'+Math.random().toString(36).slice(2,9);
+    payload.favorite=false;
+    data.recipes.push(payload);
+  }
+  save(); closeModal(); renderRecipes();
+}
+function deleteRecipe(id){
+  if(!confirm('Delete this recipe?')) return;
+  const data = curData(); data.recipes = data.recipes.filter(r=>r.id!==id); save(); closeModal(); renderRecipes();
+}
+function openRecipePicker(mode){
+  const data = curData();
+  openModal(`
+    <button class="close-x" onclick="closeModal()">✕</button>
+    <h2>Pick a recipe</h2>
+    ${data.recipes.map(r=>`<li class="item" style="cursor:pointer;" onclick="logFromRecipe('${r.id}')"><span>${escapeHtml(r.name)}</span><span class="badge muted">${r.mealTypes.join(',')}</span></li>`).join('')}
+  `);
+}
+
+/* ---------------- GROCERY ---------------- */
+function addGrocery(){
+  const name = document.getElementById('groceryName').value.trim();
+  if(!name) return;
+  const data = curData();
+  data.grocery.push({
+    id:'g_'+Math.random().toString(36).slice(2,9), name,
+    bought: document.getElementById('groceryBought').value || todayStr(),
+    expiry: document.getElementById('groceryExpiry').value || '',
+    used:false
+  });
+  save();
+  document.getElementById('groceryName').value=''; document.getElementById('groceryExpiry').value='';
+  renderGrocery();
+}
+function toggleUsed(id){ const data=curData(); const g=data.grocery.find(x=>x.id===id); g.used=!g.used; save(); renderGrocery(); }
+function deleteGrocery(id){ const data=curData(); data.grocery=data.grocery.filter(x=>x.id!==id); save(); renderGrocery(); }
+const SEASONS = {
+  0:['Carrot','Beetroot','Greens','Citrus'],1:['Carrot','Beetroot','Greens'],2:['Mango (early)','Greens'],
+  3:['Mango','Watermelon'],4:['Mango','Watermelon','Curd-based foods'],5:['Watermelon','Curd-based foods','Buttermilk'],
+  6:['Soup','Millets','Corn'],7:['Soup','Millets','Corn'],8:['Soup','Millets'],
+  9:['Pumpkin','Greens'],10:['Carrot','Greens'],11:['Carrot','Beetroot','Greens','Citrus']
+};
+function renderGrocery(){
+  const data = curData();
+  const sorted = [...data.grocery].sort((a,b)=>(a.expiry||'9999').localeCompare(b.expiry||'9999'));
+  document.getElementById('groceryList').innerHTML = sorted.map(g=>{
+    const soon = g.expiry && !g.used && g.expiry<=daysAgo(-3);
+    return `<li class="item"><span style="${g.used?'text-decoration:line-through;color:var(--muted);':''}">${escapeHtml(g.name)} ${g.expiry?`<span class="badge ${soon?'warn':'muted'}">by ${g.expiry}</span>`:''}</span>
+    <span class="row"><button class="small" onclick="toggleUsed('${g.id}')">${g.used?'Unused':'Used'}</button><button class="small danger" onclick="deleteGrocery('${g.id}')">✕</button></span></li>`;
+  }).join('') || '<p class="muted">No grocery items tracked.</p>';
+  const month = new Date().getMonth();
+  document.getElementById('seasonalBox').innerHTML = (SEASONS[month]||[]).map(f=>`<span class="chip">${f}</span>`).join('');
+}
+
+/* ---------------- PLAN ---------------- */
+function renderPlan(){
+  const data = curData();
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  data.weeklyPlan = data.weeklyPlan || {};
+  document.getElementById('weekPlanner').innerHTML = days.map(d=>{
+    data.weeklyPlan[d] = data.weeklyPlan[d] || {breakfast:'',lunch:'',dinner:''};
+    const p = data.weeklyPlan[d];
+    return `<div class="card"><h3>${d}</h3>
+      ${['breakfast','lunch','dinner'].map(mt=>`
+        <div class="field"><label>${cap(mt)}</label>
+        <select onchange="setPlan('${d}','${mt}',this.value)">
+          <option value="">—</option>
+          ${data.recipes.filter(r=>r.mealTypes.includes(mt)).map(r=>`<option value="${r.id}" ${p[mt]===r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}
+        </select></div>
+      `).join('')}
+    </div>`;
+  }).join('');
+}
+function setPlan(day,mt,val){ const data=curData(); data.weeklyPlan[day][mt]=val; save(); }
+
+/* ---------------- STATS ---------------- */
+function renderStats(){
+  const data = curData();
+  const logs = data.log;
+  const freq = {};
+  logs.forEach(l=>{ const r=l.recipeId?findRecipe(l.recipeId):null; if(r) freq[r.name]=(freq[r.name]||0)+1; });
+  const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+  const most = sorted[0]; const least = sorted[sorted.length-1];
+  const vegDays = logs.filter(l=>{ const r=l.recipeId?findRecipe(l.recipeId):null; return r && r.foodGroups.includes('fiber'); }).length;
+  let streak=0,d=new Date();
+  for(let i=0;i<60;i++){ const ds=todayStr(d); const has = logs.some(l=>l.date===ds); if(!has) break; streak++; d.setDate(d.getDate()-1); }
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat"><div class="n">${most?most[0]:'-'}</div><div class="l">Most eaten (${most?most[1]:0}×)</div></div>
+    <div class="stat"><div class="n">${least?least[0]:'-'}</div><div class="l">Least eaten</div></div>
+    <div class="stat"><div class="n">${vegDays}</div><div class="l">Fiber-rich meals</div></div>
+    <div class="stat"><div class="n">${streak}</div><div class="l">Day logging streak</div></div>
+  `;
+  document.getElementById('favList').innerHTML = data.recipes.filter(r=>r.rating>=4).map(r=>`<li class="item"><span>${escapeHtml(r.name)}</span><span class="badge">${'⭐'.repeat(r.rating)}</span></li>`).join('') || '<p class="muted">Rate recipes 4-5 stars to see favorites here.</p>';
+}
+
+/* ---------------- CHAT / AI ---------------- */
+function buildAiContext(){
+  const data = curData();
+  const since = daysAgo(14);
+  return {
+    recentMeals: data.log.filter(l=>l.date>=since).map(l=>({date:l.date,meal:l.mealType,what:l.text})),
+    recipes: data.recipes.map(r=>({name:r.name,mealTypes:r.mealTypes,foodGroups:r.foodGroups,ingredients:r.ingredients,rating:r.rating})),
+    pantry: data.grocery.filter(g=>!g.used).map(g=>({name:g.name,expiry:g.expiry}))
+  };
+}
+async function callAI(prompt){
+  const {aiProvider, aiKey, aiModel} = STORE.settings;
+  if(aiProvider==='anthropic'){
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': aiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({ model: aiModel||'claude-sonnet-4-5-20250929', max_tokens: 500, messages:[{role:'user',content:prompt}] })
+    });
+    if(!res.ok) throw new Error('AI request failed: '+res.status);
+    const json = await res.json();
+    return (json.content && json.content[0] && json.content[0].text) || '(no response)';
+  } else if(aiProvider==='openai'){
+    const res = await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+aiKey },
+      body: JSON.stringify({ model: aiModel||'gpt-4o-mini', messages:[{role:'user',content:prompt}], max_tokens:500 })
+    });
+    if(!res.ok) throw new Error('AI request failed: '+res.status);
+    const json = await res.json();
+    return json.choices?.[0]?.message?.content || '(no response)';
+  }
+  throw new Error('No AI provider configured');
+}
+function openChat(prefill){ showView('chat'); if(prefill) document.getElementById('chatInput').value = prefill; renderChatHistory(); }
+let chatHistory = [];
+function renderChatHistory(){
+  document.getElementById('chatLog').innerHTML = chatHistory.map(m=>`<div class="msg ${m.role}">${escapeHtml(m.text)}</div>`).join('') || '<p class="muted">Ask about your meals, ingredients on hand, or what to cook.</p>';
+}
+async function sendChat(){
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text) return;
+  chatHistory.push({role:'user',text}); input.value=''; renderChatHistory();
+  if(STORE.settings.aiProvider==='none' || !STORE.settings.aiKey){
+    const data = curData();
+    const lower = text.toLowerCase();
+    const mentioned = data.recipes.filter(r=>r.ingredients.some(i=>lower.includes(i.toLowerCase())));
+    let reply;
+    if(mentioned.length){ reply = 'Without an AI key, here\'s a simple ingredient match:\n' + mentioned.slice(0,6).map(r=>'• '+r.name).join('\n'); }
+    else { reply = 'Add an AI key in Settings for natural-language answers. Meanwhile, try the Recipes tab search.'; }
+    chatHistory.push({role:'ai',text:reply}); renderChatHistory();
+    return;
+  }
+  try{
+    const ctx = buildAiContext();
+    const prompt = `You are a meal-planning assistant. User context (recent meals, recipe library, pantry):\n${JSON.stringify(ctx)}\n\nUser question: ${text}\n\nAnswer concisely and practically.`;
+    const reply = await callAI(prompt);
+    chatHistory.push({role:'ai',text:reply});
+  }catch(e){
+    chatHistory.push({role:'ai',text:'AI request failed: '+e.message});
+  }
+  renderChatHistory();
+}
+
+/* ---------------- PROFILES ---------------- */
+function openProfileSwitcher(){
+  openModal(`<button class="close-x" onclick="closeModal()">✕</button><h2>Switch profile</h2>
+  ${STORE.profiles.map(p=>`<li class="item" style="cursor:pointer;" onclick="switchProfile('${p.id}')"><span>${escapeHtml(p.name)}</span>${p.id===STORE.active?'<span class="badge">current</span>':''}</li>`).join('')}`);
+}
+function switchProfile(id){ STORE.active = id; save(); closeModal(); showView('today'); }
+function addProfile(){
+  const name = document.getElementById('newProfileName').value.trim();
+  if(!name) return;
+  const id = 'p_'+Math.random().toString(36).slice(2,9);
+  STORE.profiles.push({id,name});
+  STORE.data[id] = blankProfileData();
+  save(); document.getElementById('newProfileName').value=''; renderSettings();
+}
+function renderSettings(){
+  document.getElementById('profileList').innerHTML = STORE.profiles.map(p=>`<li class="item"><span>${escapeHtml(p.name)} ${p.id===STORE.active?'<span class="badge">active</span>':''}</span><button class="small" onclick="switchProfile('${p.id}')">Use</button></li>`).join('');
+  document.getElementById('aiProvider').value = STORE.settings.aiProvider;
+  document.getElementById('aiKey').value = STORE.settings.aiKey;
+  document.getElementById('aiModel').value = STORE.settings.aiModel;
+}
+function saveAiSettings(){
+  STORE.settings.aiProvider = document.getElementById('aiProvider').value;
+  STORE.settings.aiKey = document.getElementById('aiKey').value.trim();
+  STORE.settings.aiModel = document.getElementById('aiModel').value.trim();
+  save();
+  document.getElementById('dataStatus').textContent = 'AI settings saved.';
+}
+
+/* ---------------- DATA EXPORT/IMPORT ---------------- */
+function exportData(){
+  const blob = new Blob([JSON.stringify(STORE,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='meal-ai-backup.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  document.getElementById('dataStatus').textContent = 'Exported meal-ai-backup.json';
+}
+document.getElementById('importFile').addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = evt=>{
+    try{
+      const imported = JSON.parse(evt.target.result);
+      if(!imported.profiles||!imported.data) throw new Error('bad format');
+      STORE = imported; save();
+      document.getElementById('dataStatus').textContent = 'Data loaded.';
+      showView('today');
+    }catch(err){ alert('Could not read that file.'); }
+  };
+  reader.readAsText(file); e.target.value='';
+});
+function wipeProfile(){
+  if(!confirm('Erase all data for this profile? This cannot be undone.')) return;
+  STORE.data[STORE.active] = blankProfileData(); save(); showView('today');
+}
+
+/* ---------------- utils ---------------- */
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+/* ---------------- init ---------------- */
+renderToday();
+</script>
+</body>
+</html>
