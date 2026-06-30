@@ -325,6 +325,42 @@ function seedRecipes(){
     r('Grilled Chicken',['dinner'],['protein'],['Chicken','Spices','Oil']),
     r('Soup',['dinner','snack'],['fiber'],['Mixed vegetables','Stock']),
     r('Salad',['lunch','dinner','snack'],['fiber','leafyVeg'],['Cucumber','Tomato','Lettuce','Lemon']),
+    r('Vermicelli Upma',['breakfast'],['grain'],['Vermicelli','Onion','Carrot','Peas','Mustard seeds']),
+    r('Akki Rotti',['breakfast','dinner'],['grain'],['Rice flour','Onion','Green chili','Coriander','Cumin']),
+    r('Jowar Rotti',['breakfast','dinner'],['grain','fiber'],['Jowar flour','Water','Salt']),
+    r('Bendi Gravy',['lunch','dinner'],['fiber'],['Okra','Onion','Tomato','Spices']),
+    r('Bendi Palya',['lunch','dinner'],['fiber'],['Okra','Onion','Mustard seeds','Curry leaves']),
+    r('Cabbage Palya',['lunch','dinner'],['fiber','leafyVeg'],['Cabbage','Mustard seeds','Coconut','Curry leaves']),
+    r('Tomato Rasam (Garlic)',['lunch'],['fiber'],['Tomato','Garlic','Tamarind','Rasam powder']),
+    r('Thondekayi Palya',['lunch','dinner'],['fiber'],['Ridge gourd','Mustard seeds','Coconut']),
+    r('Drumstick & Thondekayi Palya',['lunch','dinner'],['fiber'],['Drumstick','Ridge gourd','Coconut','Mustard seeds']),
+    r('Drumstick Sambar',['lunch'],['legume','fiber'],['Drumstick','Toor dal','Tamarind','Sambar powder']),
+    r('Brinjal Sambar',['lunch'],['legume','fiber'],['Brinjal','Toor dal','Tamarind','Sambar powder']),
+    r('Brinjal Palya',['lunch','dinner'],['fiber'],['Brinjal','Onion','Mustard seeds']),
+    r('Beans Palya',['lunch','dinner'],['fiber'],['Beans','Coconut','Mustard seeds','Curry leaves']),
+    r('Vegetable Pulav',['lunch','dinner'],['grain','fiber'],['Rice','Mixed vegetables','Spices']),
+    r('Paneer Gravy',['dinner'],['protein','dairy'],['Paneer','Onion','Tomato','Cream']),
+    r('Paneer Tikka',['dinner','snack'],['protein','dairy'],['Paneer','Capsicum','Onion','Spices','Yogurt']),
+    r('Paneer Sandwich',['breakfast','lunch','snack'],['protein','dairy','grain'],['Bread','Paneer','Capsicum','Chutney']),
+    r('Palak Paneer',['dinner'],['protein','dairy','leafyVeg'],['Spinach','Paneer','Onion','Tomato','Cream']),
+    r('Palak Palya',['lunch','dinner'],['leafyVeg','fiber'],['Spinach','Moong dal','Mustard seeds']),
+    r('Tomato Onion Gravy',['dinner'],['fiber'],['Tomato','Onion','Spices']),
+    r('Malabar Spinach Sambar',['lunch'],['legume','fiber','leafyVeg'],['Malabar spinach','Toor dal','Tamarind','Sambar powder']),
+    r('Raddish Sambar',['lunch'],['legume','fiber'],['Radish','Toor dal','Tamarind','Sambar powder']),
+    r('Mix Veggie Sambar',['lunch'],['legume','fiber'],['Mixed vegetables','Toor dal','Tamarind','Sambar powder']),
+    r('Moong Rasam',['lunch'],['legume','protein','fiber'],['Moong dal','Tomato','Garlic','Rasam powder']),
+    r('Dal Tadka',['lunch','dinner'],['legume','protein','fiber'],['Toor dal','Onion','Tomato','Ghee','Cumin']),
+    r('Bottleguard Palya',['lunch','dinner'],['fiber'],['Bottle gourd','Coconut','Mustard seeds']),
+    r('Bitterguard Palya',['lunch','dinner'],['fiber'],['Bitter gourd','Onion','Coconut']),
+    r('Brinjal Rava Fry',['lunch','dinner','snack'],['fiber'],['Brinjal','Rava','Spices']),
+    r('Paneer Rice Bowl',['lunch','dinner'],['protein','dairy','grain'],['Rice','Paneer','Mixed vegetables','Sauce']),
+    r('Groundnut Chutney',['breakfast'],['protein'],['Groundnut','Green chili','Tamarind','Garlic']),
+    r('Paneer Biryani',['lunch','dinner'],['protein','dairy','grain'],['Rice','Paneer','Spices','Yogurt']),
+    r('Mushroom Biryani',['lunch','dinner'],['grain','fiber'],['Rice','Mushroom','Spices','Yogurt']),
+    r('Tomato Rice',['lunch','dinner'],['grain','fiber'],['Rice','Tomato','Spices']),
+    r('Tamarind Rice',['lunch'],['grain'],['Rice','Tamarind','Peanuts','Sesame']),
+    r('Bread Peanut Butter Banana',['breakfast','snack'],['fruit','protein','grain'],['Bread','Peanut butter','Banana']),
+    r('Bread Masala',['breakfast'],['grain'],['Bread','Onion','Tomato','Spices']),
   ];
 }
 function load(){
@@ -338,6 +374,26 @@ function load(){
 }
 function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(STORE)); }
 let STORE = load();
+/* migrate: add any new default recipes that don't exist yet for each profile, without touching logged history */
+function migrateDefaultRecipes(){
+  let changed=false;
+  const master = seedRecipes();
+  Object.keys(STORE.data||{}).forEach(pid=>{
+    const profile = STORE.data[pid];
+    if(!profile.recipes) profile.recipes=[];
+    const existing = new Set(profile.recipes.map(rc=>rc.name.trim().toLowerCase()));
+    master.forEach(mr=>{
+      const key = mr.name.trim().toLowerCase();
+      if(!existing.has(key)){
+        profile.recipes.push(Object.assign({}, mr, { id:'r_'+Math.random().toString(36).slice(2,9) }));
+        existing.add(key);
+        changed=true;
+      }
+    });
+  });
+  if(changed) save();
+}
+migrateDefaultRecipes();
 function curData(){ return STORE.data[STORE.active]; }
 
 /* ---------------- nav ---------------- */
